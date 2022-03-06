@@ -79,8 +79,6 @@ function runOnInterval(interval_in_ms, function_to_run, only_run_once = false) {
 }
 runOnInterval(timeFrame, () => {
   // function to run every timeFrame
-  const d = new Date();
-  const current = d.getHours() + ":" + d.getMinutes();
   if (babyCandle.length != 0) {
     open().forEach(function (elemen) {
       openCandle.push(elemen);
@@ -94,20 +92,13 @@ runOnInterval(timeFrame, () => {
     close().forEach(function (elemen) {
       closeCandle.push(elemen);
     });
-    console.log(`Candles created ${current}`);
-  } else if (closeCandle.length == 0) {
-    return console.log(
-      `Candles failed, but dont worry about that just keep script running ${current}`
-    );
   } else {
     openCandle.push(openCandle[openCandle.length - 1]);
     highCandle.push(highCandle[highCandle.length - 1]);
     lowCandle.push(lowCandle[lowCandle.length - 1]);
     closeCandle.push(closeCandle[closeCandle.length - 1]);
-    console.log(
-      `Candles copy cause was not conversion at timeframe ${current}`
-    );
   }
+  const d = new Date();
   maturCandle.push(`${d}`);
   maturCandle.push(openCandle[openCandle.length - 1]);
   maturCandle.push(highCandle[highCandle.length - 1]);
@@ -124,7 +115,7 @@ runOnInterval(timeFrame, () => {
 
 // strategy
 
-let mp = 0; // change to 1 if you're already holding the asset
+let mp = 0;
 var Stock = require("stock-technical-indicators");
 const Indicator = Stock.Indicator;
 const { Supertrend } = require("stock-technical-indicators/study/Supertrend");
