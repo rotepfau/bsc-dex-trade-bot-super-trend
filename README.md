@@ -2,7 +2,7 @@
 
 This is a trade bot using super trend strategy to buy and sell at dex exchanges at BSC
 
-follow this steps:
+follow this steps:\
 -rename 'example.env' to '.env' and update with your configuration\
 -install node in your computer\
 -run 'npm install' at terminal\
@@ -11,4 +11,4 @@ follow this steps:
 
 monitorate with caution:\
 -make sure that have at least one conversion at the first timeframe(30min default), unless it will not work\
-
+-change on index.js 'const mp = ' to 1 if you have already bought the asset
