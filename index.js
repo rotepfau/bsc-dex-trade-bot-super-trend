@@ -115,7 +115,7 @@ runOnInterval(timeFrame, () => {
 
 // strategy
 
-let mp = 1;
+let mp = 0;
 var Stock = require("stock-technical-indicators");
 const Indicator = Stock.Indicator;
 const { Supertrend } = require("stock-technical-indicators/study/Supertrend");
