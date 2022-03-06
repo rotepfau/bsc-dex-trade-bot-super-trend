@@ -8,5 +8,5 @@ This is a trade bot using super trend strategy to buy and sell at dex exchanges 
 -then run 'node index.js'
 
 make sure to do this things:\
--make sure that have one conversion at the firt timeframe, unless it will not work\
+-make sure that have at least one conversion at the first timeframe(30min default), unless it will not work\
 -the bot will start to work after supertrend can get calculated\
