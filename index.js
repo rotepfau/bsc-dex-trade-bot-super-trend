@@ -58,7 +58,7 @@ const getSwap = async () => {
   const coinReserve = ethers.utils.formatUnits(pairData[1], "ether");
   const shitReserve = ethers.utils.formatUnits(pairData[0], "ether");
   const conversion = [Number(coinReserve) / Number(shitReserve)];
-  console.log(`Conversion:${conversion}`);
+  // console.log(`Conversion:${conversion}`);
   conversion.forEach(function (elemen) {
     babyCandle.push(elemen);
   });
@@ -153,7 +153,7 @@ function strategy() {
     mp = 0;
   }
 
-  console.log(`${lastCloseCandle},${activeSuperTrend},${dirSuperTrend}`);
+  // console.log(`${lastCloseCandle},${activeSuperTrend},${dirSuperTrend}`);
 }
 
 // buy
