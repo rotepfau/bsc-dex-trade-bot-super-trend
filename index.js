@@ -143,12 +143,12 @@ function strategy() {
   const lastCloseCandle = closeCandle[closeCandle.length - 1];
 
   if (dirSuperTrend == 1 && mp != 1) {
-    console.log(`Comprando em ${new Date()}`);
+    console.log(`Buyin ${new Date()}`);
     buyAction();
     mp = 1;
   }
   if (dirSuperTrend == -1 && mp != 0) {
-    console.log(`Vendendo em ${new Date()}`);
+    console.log(`Selling ${new Date()}`);
     sellAction();
     mp = 0;
   }
