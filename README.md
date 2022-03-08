@@ -10,4 +10,4 @@ follow this steps:\
 -the bot will start to work after supertrend can get calculated
 
 monitorate with caution:\
--change on index.js 'const mp = ' to 1 if you have already bought the asset
+-change on index.js 'let mp = 0' to 1 if you have already bought the asset
