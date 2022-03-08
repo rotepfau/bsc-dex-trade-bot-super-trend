@@ -10,5 +10,4 @@ follow this steps:\
 -the bot will start to work after supertrend can get calculated
 
 monitorate with caution:\
--make sure that have at least one conversion at the first timeframe(30min default), unless it will not work\
 -change on index.js 'const mp = ' to 1 if you have already bought the asset
