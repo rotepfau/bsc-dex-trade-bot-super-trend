@@ -1,7 +1,7 @@
 require("dotenv").config();
 const ethers = require("ethers");
 const abi = require("./etc/Erc20.json");
-const { SuperTrend } = require("@debut/indicators");
+const { SuperTrend, EMA } = require("@debut/indicators");
 const { MaxUint256 } = require("@ethersproject/constants");
 
 const data = {
@@ -48,6 +48,7 @@ const routerContract = new ethers.Contract(
 //price get
 const timeFrame = data.timeFrame * 60 * 1000; //timeframe in minutes
 let conversions = [];
+
 const getSwap = async () => {
   const pairData = await pairContract.getReserves();
   const coinReserve = ethers.utils.formatUnits(pairData[1], "ether");
@@ -74,6 +75,7 @@ function runOnInterval(interval_in_ms, function_to_run, only_run_once = false) {
 }
 
 const supertrend = new SuperTrend();
+const ema = new EMA(20);
 let initialized;
 let mp = 0;
 
@@ -81,31 +83,47 @@ let mp = 0;
 runOnInterval(timeFrame, () => {
   const d = new Date();
   const c = d.getHours() + ":" + d.getMinutes() + ":" + d.getSeconds();
+  let st;
+  let e;
   if (conversions.length !== 0) {
     console.log(`Candle created ${c}`);
+    // console.table({ o: open(), h: high(), l: low(), c: close() });
     st = supertrend.nextValue(high(), low(), close());
+    e = ema.nextValue(close());
   } else if (!initialized) {
     return console.log(
       `Candle reseted cause first timeframe interval was not conversions ${c}`
     );
   } else {
+    const prev = supertrend.atr.prevClose;
     console.log(`Timeframe without conversions, copying prevClose value ${c}`);
-    st = supertrend.nextValue(
-      supertrend.atr.prevClose,
-      supertrend.atr.prevClose,
-      supertrend.atr.prevClose
-    );
+    // console.table({ o: prev, h: prev, l: prev, c: prev });
+    st = supertrend.nextValue(prev, prev, prev);
+    e = ema.nextValue(prev);
   }
-  if (st && st.direction === 1 && mp === 0) {
+  if (
+    st &&
+    e &&
+    supertrend.atr.prevClose > e &&
+    st.direction === 1 &&
+    mp === 0
+  ) {
     console.log(`Buyin ${new Date()}`);
-    buyAction();
+    // buyAction();
     mp = 1;
   }
-  if (st && st.direction === -1 && mp === 1) {
+  if (
+    st &&
+    e &&
+    supertrend.atr.prevClose < e &&
+    st.direction === -1 &&
+    mp === 1
+  ) {
     console.log(`Selling ${new Date()}`);
-    sellAction();
+    // sellAction();
     mp = 0;
   }
+  console.log(ema);
   conversions = [];
   initialized = true;
 });
