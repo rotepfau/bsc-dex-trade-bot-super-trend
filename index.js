@@ -1,7 +1,8 @@
 require("dotenv").config();
 const ethers = require("ethers");
-const { Contract } = require("ethers");
 const abi = require("./etc/Erc20.json");
+const { SuperTrend } = require("@debut/indicators");
+const { MaxUint256 } = require("@ethersproject/constants");
 
 const data = {
   COIN: process.env.COIN_CONTRACT, // 'STABLE' COIN
@@ -46,134 +47,103 @@ const routerContract = new ethers.Contract(
 
 //price get
 const timeFrame = data.timeFrame * 60 * 1000; //timeframe in minutes
-let babyCandle = [],
-  openCandle = [],
-  highCandle = [],
-  lowCandle = [],
-  closeCandle = [],
-  maturCandle = [],
-  candle = [];
+let conversions = [];
 const getSwap = async () => {
   const pairData = await pairContract.getReserves();
   const coinReserve = ethers.utils.formatUnits(pairData[1], "ether");
   const shitReserve = ethers.utils.formatUnits(pairData[0], "ether");
   const conversion = [Number(coinReserve) / Number(shitReserve)];
-  // console.log(`Conversion:${conversion}`);
   conversion.forEach(function (elemen) {
-    babyCandle.push(elemen);
+    conversions.push(elemen);
   });
 };
 
 pairContract.on("Swap", getSwap); // function to detect swap and run getSwap function
 
 //candle born
-let open = () => [babyCandle[0]];
-let high = (time) => [Math.max.apply(null, time)];
-let low = (time) => [Math.min.apply(null, time)];
-let close = () => [babyCandle[babyCandle.length - 1]];
+const open = () => conversions[0];
+const high = () => Math.max.apply(null, conversions);
+const low = () => Math.min.apply(null, conversions);
+const close = () => conversions[conversions.length - 1];
+
 function runOnInterval(interval_in_ms, function_to_run, only_run_once = false) {
   setTimeout(() => {
     function_to_run();
     if (!only_run_once) runOnInterval(...arguments);
-  }, interval_in_ms - ((Date.now() - new Date().getTimezoneOffset() * 6e4) % interval_in_ms));
+  }, interval_in_ms - ((Math.round(Date.now() / 1000) * 1000) % interval_in_ms));
 }
+
+const supertrend = new SuperTrend();
+let initialized;
+let mp = 0;
+
+// function to run every timeFrame
 runOnInterval(timeFrame, () => {
-  // function to run every timeFrame
   const d = new Date();
-  const c = d.getHours() + ":" + d.getMinutes();
-  if (babyCandle.length != 0) {
-    open().forEach(function (elemen) {
-      openCandle.push(elemen);
-    });
-    high(babyCandle).forEach(function (elemen) {
-      highCandle.push(elemen);
-    });
-    low(babyCandle).forEach(function (elemen) {
-      lowCandle.push(elemen);
-    });
-    close().forEach(function (elemen) {
-      closeCandle.push(elemen);
-    });
+  const c = d.getHours() + ":" + d.getMinutes() + ":" + d.getSeconds();
+  if (conversions.length !== 0) {
     console.log(`Candle created ${c}`);
-  } else if (closeCandle.length == 0) {
+    st = supertrend.nextValue(high(), low(), close());
+  } else if (!initialized) {
     return console.log(
       `Candle reseted cause first timeframe interval was not conversions ${c}`
     );
   } else {
-    openCandle.push(openCandle[openCandle.length - 1]);
-    highCandle.push(highCandle[highCandle.length - 1]);
-    lowCandle.push(lowCandle[lowCandle.length - 1]);
-    closeCandle.push(closeCandle[closeCandle.length - 1]);
-    console.log(
-      `Candle copy cause current timeframe interval was not conversions ${c}`
+    console.log(`Timeframe without conversions, copying prevClose value ${c}`);
+    st = supertrend.nextValue(
+      supertrend.atr.prevClose,
+      supertrend.atr.prevClose,
+      supertrend.atr.prevClose
     );
   }
-  maturCandle.push(`${d}`);
-  maturCandle.push(openCandle[openCandle.length - 1]);
-  maturCandle.push(highCandle[highCandle.length - 1]);
-  maturCandle.push(lowCandle[lowCandle.length - 1]);
-  maturCandle.push(closeCandle[closeCandle.length - 1]);
-  candle.push(maturCandle);
-
-  if (closeCandle.length > 10) {
-    strategy();
-  }
-  babyCandle = [];
-  maturCandle = [];
-});
-
-// strategy
-
-let mp = 0; // change to 1 if you are already holding the asset
-var Stock = require("stock-technical-indicators");
-const Indicator = Stock.Indicator;
-const { Supertrend } = require("stock-technical-indicators/study/Supertrend");
-
-function strategy() {
-  const newStudyATR = new Indicator(new Supertrend());
-  const superTrend = newStudyATR.calculate(candle, {
-    period: 10,
-    multiplier: 10,
-  });
-  const lastSuperTrend = superTrend[superTrend.length - 1];
-  const objSuperTrend = lastSuperTrend["Supertrend"];
-  const dirSuperTrend = objSuperTrend["Direction"];
-  const activeSuperTrend = objSuperTrend["ActiveTrend"];
-
-  const lastCloseCandle = closeCandle[closeCandle.length - 1];
-
-  if (dirSuperTrend == 1 && mp != 1) {
+  if (st && st.direction === 1 && mp === 0) {
     console.log(`Buyin ${new Date()}`);
     buyAction();
     mp = 1;
   }
-  if (dirSuperTrend == -1 && mp != 0) {
+  if (st && st.direction === -1 && mp === 1) {
     console.log(`Selling ${new Date()}`);
     sellAction();
     mp = 0;
   }
+  conversions = [];
+  initialized = true;
+});
 
-  // console.log(`${lastCloseCandle},${activeSuperTrend},${dirSuperTrend}`);
-}
+const getBalance = async (token) => {
+  const contract = new ethers.Contract(token, abi, provider);
+  const balance = await contract.balanceOf(data.recipient);
+  return balance.toString();
+};
+
+const approveHandler = async (token) => {
+  console.log("Checking for approved token:", token);
+  const contract = new ethers.Contract(token, abi, provider);
+  const allow = await contract.allowance(data.recipient, data.router);
+  if (allow.isZero()) {
+    const contract = new ethers.Contract(token, abi, signer);
+    const approve = await contract.approve(data.router, MaxUint256);
+    const receipt = await approve.wait();
+    console.log(receipt);
+  } else {
+    console.log("Token is already approved.");
+  }
+};
+
+approveHandler(tokenIn);
+approveHandler(tokenOut);
 
 // buy
 
-let buyAction = async () => {
-  const getBalance = async () => {
-    const contract = new Contract(tokenIn, abi, provider);
-    const balance = await contract.balanceOf(data.recipient);
-    return balance.toString();
-  };
-  const amountIn = await getBalance();
+const buyAction = async () => {
+  const amountIn = await getBalance(tokenIn);
   const amounts = await routerContract.getAmountsOut(amountIn, [
     tokenIn,
     tokenOut,
   ]);
   const amountOutMin = amounts[1].sub(amounts[1].div(`${data.slippage}`));
-
   console.log(ethers.utils.formatUnits(amountIn, "ether"));
   console.log(ethers.utils.formatUnits(amountOutMin, "ether"));
-
   const swapTx = await routerContract.swapExactTokensForTokens(
     amountIn,
     amountOutMin,
@@ -185,29 +155,21 @@ let buyAction = async () => {
       gasPrice: data.gasPrice,
     }
   );
-
   receipt = await swapTx.wait();
   console.log(receipt);
 };
 
 // sell
 
-let sellAction = async () => {
-  const getBalance = async () => {
-    const contract = new Contract(tokenOut, abi, provider);
-    const balance = await contract.balanceOf(data.recipient);
-    return balance.toString();
-  };
-  const amountIn = await getBalance();
+const sellAction = async () => {
+  const amountIn = await getBalance(tokenOut);
   const amounts = await routerContract.getAmountsOut(amountIn, [
     tokenOut,
     tokenIn,
   ]);
   const amountOutMin = amounts[1].sub(amounts[1].div(`${data.slippage}`));
-
   console.log(ethers.utils.formatUnits(amountIn, "ether"));
   console.log(ethers.utils.formatUnits(amountOutMin, "ether"));
-
   const swapTx = await routerContract.swapExactTokensForTokens(
     amountIn,
     amountOutMin,
@@ -219,7 +181,6 @@ let sellAction = async () => {
       gasPrice: data.gasPrice,
     }
   );
-
   receipt = await swapTx.wait();
   console.log(receipt);
 };
