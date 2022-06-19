@@ -74,10 +74,11 @@ function runOnInterval(interval_in_ms, function_to_run, only_run_once = false) {
   }, interval_in_ms - ((Math.round(Date.now() / 1000) * 1000) % interval_in_ms));
 }
 
-const supertrend = new SuperTrend();
-const ema = new EMA(20);
+const supertrend = new SuperTrend(3, 1);
+const ema = new EMA(3);
 let initialized;
 let mp = 0;
+let prevSt;
 
 // function to run every timeFrame
 runOnInterval(timeFrame, () => {
@@ -86,46 +87,57 @@ runOnInterval(timeFrame, () => {
   let st;
   let e;
   if (conversions.length !== 0) {
-    console.log(`Candle created ${c}`);
+    // console.log(`Candle created ${c}`);
     // console.table({ o: open(), h: high(), l: low(), c: close() });
     st = supertrend.nextValue(high(), low(), close());
     e = ema.nextValue(close());
   } else if (!initialized) {
-    return console.log(
-      `Candle reseted cause first timeframe interval was not conversions ${c}`
-    );
+    return;
+    // return console.log(
+    //   `Candle reseted cause first timeframe interval was not conversions ${c}`
+    // );
   } else {
     const prev = supertrend.atr.prevClose;
-    console.log(`Timeframe without conversions, copying prevClose value ${c}`);
+    // console.log(`Timeframe without conversions, copying prevClose value ${c}`);
     // console.table({ o: prev, h: prev, l: prev, c: prev });
     st = supertrend.nextValue(prev, prev, prev);
     e = ema.nextValue(prev);
   }
-  if (
-    st &&
-    e &&
-    supertrend.atr.prevClose > e &&
-    st.direction === 1 &&
-    mp === 0
-  ) {
-    console.log(`Buyin ${new Date()}`);
-    // buyAction();
-    mp = 1;
+  if (st && e) {
+    if (
+      supertrend.atr.prevClose > e &&
+      st.direction === 1 &&
+      prevSt === -1 &&
+      mp === 0
+    ) {
+      console.log(`Buyin ${new Date()}`);
+      console.log(`
+        e: ${e},
+        prevClose: ${supertrend.atr.prevClose},
+        dir: ${st.direction}
+      `);
+      // buyAction();
+      mp = 1;
+    }
+    if (
+      supertrend.atr.prevClose < e &&
+      st.direction === -1 &&
+      prevSt === 1 &&
+      mp === 1
+    ) {
+      console.log(`
+        e: ${e},
+        prevClose: ${supertrend.atr.prevClose},
+        dir: ${st.direction}
+      `);
+      console.log(`Selling ${new Date()}`);
+      // sellAction();
+      mp = 0;
+    }
   }
-  if (
-    st &&
-    e &&
-    supertrend.atr.prevClose < e &&
-    st.direction === -1 &&
-    mp === 1
-  ) {
-    console.log(`Selling ${new Date()}`);
-    // sellAction();
-    mp = 0;
-  }
-  console.log(ema);
   conversions = [];
-  initialized = true;
+  if (st) prevSt = st.direction;
+  if (!initialized) initialized = true;
 });
 
 const getBalance = async (token) => {
