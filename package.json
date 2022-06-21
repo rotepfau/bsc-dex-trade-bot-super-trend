@@ -1,8 +1,12 @@
 {
+  "main": "src/index.ts",
   "scripts": {
-    "start": "node index"
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "start": "tsc --build && node src/index.js"
   },
   "devDependencies": {
+    "@types/node": "^18.0.0",
     "ethers": "^5.5.2"
   },
   "dependencies": {

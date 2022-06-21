@@ -1,21 +1,10 @@
-require("dotenv").config();
-const ethers = require("ethers");
-const abi = require("./etc/Erc20.json");
-const { SuperTrend, EMA } = require("@debut/indicators");
-const { MaxUint256 } = require("@ethersproject/constants");
-
-const data = {
-  STABLE: process.env.STABLE_CONTRACT, // 'STABLE' COIN
-  COIN: process.env.COIN_CONTRACT, // COIN
-  pair: process.env.PAIR_CONTRACT, // STABLE-COIN pair
-  router: process.env.ROUTER, // router CHECK!!
-  recipient: process.env.ADDRESS, //your wallet address,
-  slippage: process.env.SLIPPAGE, //in Percentage
-  gasPrice: ethers.utils.parseUnits(`${process.env.GWEI}`, "gwei"), //in gwei
-  gasLimit: process.env.GAS_LIMIT, //at least 21000
-  timeFrame: process.env.TIMEFRAME, //interval between candles
-  deadLine: +process.env.DEADLINE, //tx deadline
-};
+import * as dotenv from "dotenv";
+import { ethers } from "ethers";
+import * as abi from "./etc/abi.json";
+import data from "./etc/data";
+import { SuperTrend, EMA } from "@debut/indicators";
+import { MaxUint256 } from "@ethersproject/constants";
+dotenv.config();
 
 const wss = process.env.WSS_NODE;
 const http = process.env.HTTP_NODE;
@@ -45,7 +34,7 @@ const routerContract = new ethers.Contract(
 );
 
 //price get
-let conversions = [];
+let conversions: Array<number> = [];
 
 const getSwap = async () => {
   const pairData = await pairContract.getReserves();
@@ -60,23 +49,25 @@ pairContract.on("Swap", getSwap); // function to detect swap and run getSwap fun
 function runOnInterval(interval_in_ms, function_to_run, only_run_once = false) {
   setTimeout(() => {
     function_to_run();
-    if (!only_run_once) runOnInterval(...arguments);
+    if (!only_run_once)
+      runOnInterval(interval_in_ms, function_to_run, (only_run_once = false));
   }, interval_in_ms - ((Math.round(Date.now() / 1000) * 1000) % interval_in_ms));
 }
 
 const timeFrame = data.timeFrame * 60 * 1000; //timeframe in minutes
-const supertrend = new SuperTrend(10, 3);
-const ema = new EMA(200);
+const supertrend = new SuperTrend(data.stPeriod, data.stMult);
+const ema = new EMA(data.emaPeriod);
 let initialized;
 let mp = 1;
+let prevClose;
 let prevDir;
 
 console.info(`
   script started with the following configs:
   timeframe: ${data.timeFrame} minutes
-  supertrend_period: ${supertrend.atr.avg.period}
-  supertrend_multiplier: ${supertrend.multiplier}
-  ema_period: ${ema.period}
+  supertrend_period: ${data.stPeriod}
+  supertrend_multiplier: ${data.stMult}
+  ema_period: ${data.emaPeriod}
   current_position: ${mp} (${mp ? "buy" : "sell"})
   `);
 
@@ -103,14 +94,12 @@ runOnInterval(timeFrame, () => {
     //   `Candle reseted cause first timeframe interval was not conversions ${c}`
     // );
   } else {
-    const prev = supertrend.atr.prevClose;
     console.log(`Timeframe without conversions, copying prevClose value ${c}`);
     // console.table({ o: prev, h: prev, l: prev, c: prev });
-    st = supertrend.nextValue(prev, prev, prev);
-    e = ema.nextValue(prev);
+    st = supertrend.nextValue(prevClose, prevClose, prevClose);
+    e = ema.nextValue(prevClose);
   }
   if (st && e) {
-    const prevClose = supertrend.atr.prevClose;
     const dir = st.direction;
     if (prevClose > e && dir === -1 && prevDir === 1 && mp === 0) {
       console.log(`Buyin ${new Date()}`);
@@ -134,6 +123,7 @@ runOnInterval(timeFrame, () => {
     prevDir = dir;
   }
   if (!initialized) initialized = true;
+  prevClose = close;
 });
 
 const getBalance = async (token) => {
@@ -171,19 +161,19 @@ const buyAction = async () => {
     const amountOutMin = amounts[1].sub(amounts[1].div(`${data.slippage}`));
     console.log(ethers.utils.formatUnits(amountIn, "ether"));
     console.log(ethers.utils.formatUnits(amountOutMin, "ether"));
-    const swapTx = await routerContract.swapExactTokensForTokens(
-      amountIn,
-      amountOutMin,
-      [tokenIn, tokenOut],
-      data.recipient,
-      Date.now() + 1000 * 60 * data.deadLine,
-      {
-        gasLimit: data.gasLimit,
-        gasPrice: data.gasPrice,
-      }
-    );
-    receipt = await swapTx.wait();
-    console.log(receipt);
+    // const swapTx = await routerContract.swapExactTokensForTokens(
+    //   amountIn,
+    //   amountOutMin,
+    //   [tokenIn, tokenOut],
+    //   data.recipient,
+    //   Date.now() + 1000 * 60 * data.deadLine,
+    //   {
+    //     gasLimit: data.gasLimit,
+    // gasPrice: ethers.utils.parseUnits(`${data.gasPrice}`, "gwei"),
+    //   }
+    // );
+    // receipt = await swapTx.wait();
+    // console.log(receipt);
     mp = 1;
   } catch (err) {
     console.error(err.reason);
@@ -203,19 +193,19 @@ const sellAction = async () => {
     const amountOutMin = amounts[1].sub(amounts[1].div(`${data.slippage}`));
     console.log(ethers.utils.formatUnits(amountIn, "ether"));
     console.log(ethers.utils.formatUnits(amountOutMin, "ether"));
-    const swapTx = await routerContract.swapExactTokensForTokens(
-      amountIn,
-      amountOutMin,
-      [tokenOut, tokenIn],
-      data.recipient,
-      Date.now() + 1000 * 60 * data.deadLine,
-      {
-        gasLimit: data.gasLimit,
-        gasPrice: data.gasPrice,
-      }
-    );
-    receipt = await swapTx.wait();
-    console.log(receipt);
+    // const swapTx = await routerContract.swapExactTokensForTokens(
+    //   amountIn,
+    //   amountOutMin,
+    //   [tokenOut, tokenIn],
+    //   data.recipient,
+    //   Date.now() + 1000 * 60 * data.deadLine,
+    //   {
+    //     gasLimit: data.gasLimit,
+    //     // gasPrice: ethers.utils.parseUnits(`${data.gasPrice}`, "gwei"),
+    //   }
+    // );
+    // receipt = await swapTx.wait();
+    // console.log(receipt);
     mp = 0;
   } catch (err) {
     console.error(err.reason);
